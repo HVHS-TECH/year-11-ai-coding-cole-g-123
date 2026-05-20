@@ -1,0 +1,31 @@
+// Setup for Y10 web design
+// This defaults to the index.html file and hides all the config files
+// copy the contents into .devcontainer/devcontainer.json
+// .vscode is not needed
+
+{
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    "customizations": {
+        "codespaces": {
+            "openFiles": [ // Which file(s) to open by default
+            "index.html"
+            ]
+        },
+        "vscode": {
+            "extensions": [
+                "ritwickdey.LiveServer",  //  Install LiveServer to view pages
+                "vsls-contrib.gitdoc"	// BROKEN Install GitDoc
+            ],
+            "settings": {
+                "liveServer.settings.donotShowInfoMsg": true,
+                "gitdoc.commitValidationLevel": "none",
+                "gitdoc.enabled": true,
+                "files.exclude": {
+                    ".devcontainer/*": true,
+                    ".devcontainer": true,
+                    "README.md": true,
+                },
+            }
+        }
+    }
+}
