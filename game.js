@@ -11,7 +11,7 @@ const pipeInterval = 1500;
 const birdRadius = 18;
 const groundHeight = 90;
 
-let bird = { x: 90, y: canvas.height / 2, vy: 0 };
+let bird = { x: 90, y: canvas.height / 2, vy: 0, wingFrame: 0 };
 let pipes = [];
 let score = 0;
 let bestScore = 0;
@@ -21,6 +21,12 @@ let started = false;
 let lastTimestamp = 0;
 let groundOffset = 0;
 let currentPipeSpeed = basePipeSpeed;
+let combo = 0;
+let maxCombo = 0;
+let shakeAmount = 0;
+let particles = [];
+let scorePopups = [];
+let frameCount = 0;
 const clouds = [];
 const info = document.getElementById('gameInfo');
 const startButton = document.getElementById('startButton');
@@ -58,6 +64,12 @@ function playSound(type) {
     gain.gain.value = 0.08;
     oscillator.start();
     oscillator.stop(audioContext.currentTime + 0.1);
+  } else if (type === 'combo') {
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 800;
+    gain.gain.value = 0.1;
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.08);
   } else if (type === 'hit') {
     oscillator.type = 'square';
     oscillator.frequency.value = 180;
@@ -67,16 +79,41 @@ function playSound(type) {
   }
 }
 
+function createParticle(x, y, type) {
+  const count = type === 'flap' ? 3 : 8;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const speed = type === 'flap' ? 2 + Math.random() * 2 : 3 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      type,
+    });
+  }
+}
+
+function shake(intensity) {
+  shakeAmount = intensity;
+}
+
+
 function resetGame() {
-  bird = { x: 90, y: canvas.height / 2, vy: 0 };
+  bird = { x: 90, y: canvas.height / 2, vy: 0, wingFrame: 0 };
   pipes = [];
   score = 0;
+  combo = 0;
+  maxCombo = 0;
   lastPipeTime = 0;
   gameOver = false;
   started = false;
   lastTimestamp = 0;
   groundOffset = 0;
   currentPipeSpeed = basePipeSpeed;
+  shakeAmount = 0;
+  particles = [];
+  scorePopups = [];
   info.textContent = 'Press Start to begin.';
   startButton.textContent = 'Start';
   startButton.style.display = 'block';
@@ -84,14 +121,18 @@ function resetGame() {
 
 function startGame() {
   if (audioContext.state === 'suspended') audioContext.resume();
-  bird = { x: 90, y: canvas.height / 2, vy: 0 };
+  bird = { x: 90, y: canvas.height / 2, vy: 0, wingFrame: 0 };
   pipes = [];
   score = 0;
+  combo = 0;
   lastPipeTime = 0;
   gameOver = false;
   started = true;
   lastTimestamp = 0;
   currentPipeSpeed = basePipeSpeed;
+  shakeAmount = 0;
+  particles = [];
+  scorePopups = [];
   info.textContent = 'Tap or press Space to flap.';
   startButton.style.display = 'none';
 }
@@ -104,10 +145,16 @@ function createPipe() {
 }
 
 function endGame() {
-  if (!gameOver) playSound('hit');
+  if (!gameOver) {
+    playSound('hit');
+    createParticle(bird.x, bird.y, 'hit');
+    shake(8);
+  }
   gameOver = true;
   started = false;
   bestScore = Math.max(bestScore, score);
+  maxCombo = Math.max(maxCombo, combo);
+  combo = 0;
   info.textContent = 'Game Over! Press Start or Space to play again.';
   startButton.textContent = 'Restart';
   startButton.style.display = 'block';
@@ -116,10 +163,27 @@ function endGame() {
 function update() {
   if (!started || gameOver) return;
 
+  frameCount++;
+  bird.wingFrame = Math.floor((frameCount / 5) % 4);
   bird.vy += gravity;
   bird.y += bird.vy;
   currentPipeSpeed = Math.min(maxPipeSpeed, basePipeSpeed + score * 0.08);
   groundOffset = (groundOffset - currentPipeSpeed) % 40;
+  shakeAmount *= 0.92;
+
+  particles.forEach((p, i) => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life -= 0.02;
+    if (p.life <= 0) particles.splice(i, 1);
+  });
+
+  scorePopups.forEach((p, i) => {
+    p.y -= 1;
+    p.life -= 0.01;
+    if (p.life <= 0) scorePopups.splice(i, 1);
+  });
 
   if (bird.y + birdRadius >= canvas.height - groundHeight) {
     bird.y = canvas.height - groundHeight - birdRadius;
@@ -142,8 +206,12 @@ function update() {
 
     if (!pipe.passed && pipe.x + pipeWidth < bird.x) {
       pipe.passed = true;
-      score += 1;
-      playSound('score');
+      combo++;
+      maxCombo = Math.max(maxCombo, combo);
+      const scoreGain = combo > 1 ? combo : 1;
+      score += scoreGain;
+      scorePopups.push({ x: bird.x, y: bird.y - 30, life: 1, text: scoreGain > 1 ? `+${scoreGain}x` : '+1' });
+      playSound(combo > 1 ? 'combo' : 'score');
     }
 
     const hitLeft = bird.x + birdRadius > pipe.x;
@@ -218,6 +286,8 @@ function drawPipes() {
 
 function drawBird() {
   const rotation = Math.max(-0.5, Math.min(0.9, bird.vy * 0.05));
+  const wingOffsets = [0, -2, -3, -2];
+  const wingOffset = wingOffsets[bird.wingFrame];
 
   ctx.save();
   ctx.translate(bird.x, bird.y);
@@ -250,15 +320,43 @@ function drawBird() {
 
   ctx.fillStyle = '#ffd86d';
   ctx.beginPath();
-  ctx.moveTo(-8, -3);
-  ctx.lineTo(-20, -10);
-  ctx.lineTo(-16, 8);
+  ctx.moveTo(-8, -3 + wingOffset);
+  ctx.lineTo(-20, -10 + wingOffset);
+  ctx.lineTo(-16, 8 + wingOffset);
   ctx.fill();
 
   ctx.restore();
 }
 
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life);
+    if (p.type === 'flap') {
+      ctx.fillStyle = '#ffd53e';
+    } else {
+      ctx.fillStyle = '#ff4444';
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawScorePopups() {
+  scorePopups.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.text.includes('x') ? '#ffeb3b' : '#fff';
+    ctx.font = p.text.includes('x') ? 'bold 20px Arial' : '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.text, p.x, p.y);
+  });
+  ctx.globalAlpha = 1;
+}
+
 function drawHUD() {
+  const difficultyLevel = Math.floor(score / 5) + 1;
+
   if (!started) {
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.33)';
@@ -286,30 +384,55 @@ function drawHUD() {
     ctx.textAlign = 'left';
     ctx.strokeText(`Best: ${bestScore}`, 22, 40);
     ctx.fillText(`Best: ${bestScore}`, 22, 40);
+
+    if (combo > 0) {
+      ctx.fillStyle = combo > 3 ? '#ffeb3b' : '#fff';
+      ctx.font = combo > 3 ? 'bold 24px Arial' : '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${combo}x Combo`, canvas.width / 2, canvas.height - 120);
+    }
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Level: ${difficultyLevel}`, canvas.width - 22, 40);
   }
 
   if (gameOver) {
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillRect(50, canvas.height / 2 - 100, canvas.width - 100, 160);
+    ctx.fillRect(50, canvas.height / 2 - 100, canvas.width - 100, 200);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.font = 'bold 38px Arial';
-    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 50);
     ctx.font = '20px Arial';
-    ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2);
-    ctx.fillText('Press Start or Space to retry', canvas.width / 2, canvas.height / 2 + 40);
+    ctx.fillText(`Score: ${score}  Best: ${bestScore}`, canvas.width / 2, canvas.height / 2);
+    if (maxCombo > 1) {
+      ctx.fillText(`Max Combo: ${maxCombo}x`, canvas.width / 2, canvas.height / 2 + 30);
+    }
+    ctx.fillText('Press Start or Space to retry', canvas.width / 2, canvas.height / 2 + 60);
     ctx.restore();
   }
 }
 
 function draw() {
+  const shakeX = (Math.random() - 0.5) * shakeAmount;
+  const shakeY = (Math.random() - 0.5) * shakeAmount;
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
   drawSky();
   drawClouds();
   drawPipes();
   drawGround();
   drawBird();
+  drawParticles();
+  drawScorePopups();
   drawHUD();
+
+  ctx.restore();
 }
 
 function gameLoop(timestamp) {
@@ -326,6 +449,7 @@ function flap() {
   }
 
   bird.vy = flapStrength;
+  createParticle(bird.x - 15, bird.y, 'flap');
   playSound('flap');
 }
 
