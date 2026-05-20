@@ -28,6 +28,8 @@ let particles = [];
 let scorePopups = [];
 let frameCount = 0;
 const clouds = [];
+const stars = [];
+const grassTufts = [];
 const info = document.getElementById('gameInfo');
 const startButton = document.getElementById('startButton');
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -38,8 +40,28 @@ function createClouds() {
     { x: 240, y: 70, scale: 0.96 },
     { x: 390, y: 120, scale: 1.2 },
   ];
+  positions.forEach(pos => clouds.push({ x: pos.x, y: pos.y, scale: pos.scale, offset: 0 }));
+}
 
-  positions.forEach(pos => clouds.push({ x: pos.x, y: pos.y, scale: pos.scale }));
+function createStars() {
+  for (let i = 0; i < 35; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * (canvas.height * 0.35),
+      size: Math.random() * 1.5,
+      opacity: 0.4 + Math.random() * 0.5,
+    });
+  }
+}
+
+function createGrass() {
+  for (let i = 0; i < canvas.width / 15; i++) {
+    grassTufts.push({
+      x: i * 15,
+      height: 4 + Math.random() * 6,
+      width: 8 + Math.random() * 5,
+    });
+  }
 }
 
 function playSound(type) {
@@ -229,58 +251,162 @@ function update() {
 
 function drawSky() {
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#70d1ef');
-  gradient.addColorStop(0.4, '#5ac0e0');
-  gradient.addColorStop(1, '#49a8d4');
+  gradient.addColorStop(0, '#87ceeb');
+  gradient.addColorStop(0.3, '#5eb3d9');
+  gradient.addColorStop(0.7, '#4a9fbb');
+  gradient.addColorStop(1, '#3a8fa8');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw subtle atmospheric glow
+  const glowGrad = ctx.createRadialGradient(canvas.width / 2, 0, 0, canvas.width / 2, 0, canvas.width);
+  glowGrad.addColorStop(0, 'rgba(255, 200, 100, 0.08)');
+  glowGrad.addColorStop(1, 'rgba(255, 150, 100, 0)');
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
+
+  // Draw stars
+  stars.forEach(star => {
+    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 function drawClouds() {
-  clouds.forEach(cloud => {
+  clouds.forEach((cloud, idx) => {
     cloud.x = (cloud.x + currentPipeSpeed * 0.18) % (canvas.width + 180) - 90;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+    
+    // Draw cloud shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.beginPath();
+    ctx.ellipse(cloud.x + 5, cloud.y + 8, 60 * cloud.scale, 12 * cloud.scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw main cloud with fluffy effect
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
     ctx.beginPath();
     ctx.arc(cloud.x, cloud.y, 18 * cloud.scale, 0, Math.PI * 2);
-    ctx.arc(cloud.x + 24 * cloud.scale, cloud.y - 12 * cloud.scale, 20 * cloud.scale, 0, Math.PI * 2);
-    ctx.arc(cloud.x + 46 * cloud.scale, cloud.y + 4 * cloud.scale, 16 * cloud.scale, 0, Math.PI * 2);
-    ctx.arc(cloud.x + 20 * cloud.scale, cloud.y + 16 * cloud.scale, 16 * cloud.scale, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 24 * cloud.scale, cloud.y - 12 * cloud.scale, 22 * cloud.scale, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 46 * cloud.scale, cloud.y + 4 * cloud.scale, 18 * cloud.scale, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 20 * cloud.scale, cloud.y + 16 * cloud.scale, 18 * cloud.scale, 0, Math.PI * 2);
+    ctx.arc(cloud.x + 12 * cloud.scale, cloud.y - 4 * cloud.scale, 14 * cloud.scale, 0, Math.PI * 2);
     ctx.closePath();
+    ctx.fill();
+    
+    // Cloud highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(cloud.x + 8 * cloud.scale, cloud.y - 6 * cloud.scale, 10 * cloud.scale, 0, Math.PI * 2);
     ctx.fill();
   });
 }
 
 function drawGround() {
-  ctx.fillStyle = '#4a2f0e';
+  // Main ground fill
+  ctx.fillStyle = '#5c3d1f';
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 
+  // Ground layers
+  ctx.fillStyle = '#4a2f0e';
+  ctx.fillRect(0, canvas.height - groundHeight + 2, canvas.width, groundHeight - 2);
+
+  // Dirt texture pattern
   ctx.fillStyle = '#3d2310';
-  for (let x = groundOffset; x < canvas.width + 40; x += 40) {
-    ctx.fillRect(x, canvas.height - groundHeight, 24, groundHeight);
+  for (let x = groundOffset; x < canvas.width + 50; x += 40) {
+    ctx.fillRect(x, canvas.height - groundHeight + 4, 24, groundHeight - 4);
   }
 
-  ctx.fillStyle = '#7e562f';
-  ctx.fillRect(0, canvas.height - groundHeight - 4, canvas.width, 4);
+  // Soil variation
+  ctx.fillStyle = '#6b4423';
+  for (let x = groundOffset + 20; x < canvas.width + 50; x += 40) {
+    ctx.fillRect(x, canvas.height - groundHeight + 6, 18, groundHeight - 6);
+  }
+
+  // Top grass line
+  ctx.fillStyle = '#6d8c45';
+  ctx.fillRect(0, canvas.height - groundHeight - 1, canvas.width, 3);
+
+  // Grass tufts
+  grassTufts.forEach((tuft, i) => {
+    const xPos = (tuft.x + groundOffset * 0.6) % canvas.width;
+    ctx.fillStyle = '#5a7a38';
+    ctx.fillRect(xPos, canvas.height - groundHeight - tuft.height, tuft.width * 0.4, tuft.height);
+    ctx.fillStyle = '#7a9a4a';
+    ctx.fillRect(xPos + tuft.width * 0.35, canvas.height - groundHeight - tuft.height, tuft.width * 0.35, tuft.height);
+  });
+
+  // Ground shine/highlight
+  ctx.fillStyle = 'rgba(200, 180, 160, 0.06)';
+  ctx.fillRect(0, canvas.height - groundHeight - 2, canvas.width, 3);
 }
 
 function drawPipes() {
   pipes.forEach(pipe => {
-    const gradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
-    gradient.addColorStop(0, '#4a8a37');
-    gradient.addColorStop(1, '#2d6621');
+    const topPipeHeight = pipe.top;
+    const bottomPipeStart = pipe.top + pipeGap;
+    const bottomPipeHeight = canvas.height - groundHeight - bottomPipeStart;
 
-    ctx.fillStyle = gradient;
+    // Top pipe
+    const topGradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
+    topGradient.addColorStop(0, '#5aa844');
+    topGradient.addColorStop(0.5, '#3d8a37');
+    topGradient.addColorStop(1, '#2d6621');
+    ctx.fillStyle = topGradient;
+    ctx.fillRect(pipe.x, 0, pipeWidth, topPipeHeight);
+
+    // Top pipe outline and highlight
     ctx.strokeStyle = '#1e4c16';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(pipe.x, 0, pipeWidth, topPipeHeight);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(pipe.x + 2, 2, pipeWidth - 4, topPipeHeight * 0.15);
 
-    ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
-    ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
-    ctx.fillRect(pipe.x, pipe.top + pipeGap, pipeWidth, canvas.height - groundHeight - pipe.top - pipeGap);
-    ctx.strokeRect(pipe.x, pipe.top + pipeGap, pipeWidth, canvas.height - groundHeight - pipe.top - pipeGap);
+    // Top pipe cap
+    ctx.fillStyle = '#2d5c1d';
+    ctx.fillRect(pipe.x - 6, topPipeHeight - 6, pipeWidth + 12, 6);
+    ctx.strokeStyle = '#1e3c0d';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pipe.x - 6, topPipeHeight - 6, pipeWidth + 12, 6);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillRect(pipe.x + 10, 12, 18, pipe.top - 18);
-    ctx.fillRect(pipe.x + 10, pipe.top + pipeGap + 12, 18, canvas.height - groundHeight - pipe.top - pipeGap - 18);
+    // Bottom pipe
+    const bottomGradient = ctx.createLinearGradient(pipe.x, bottomPipeStart, pipe.x + pipeWidth, bottomPipeStart);
+    bottomGradient.addColorStop(0, '#5aa844');
+    bottomGradient.addColorStop(0.5, '#3d8a37');
+    bottomGradient.addColorStop(1, '#2d6621');
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(pipe.x, bottomPipeStart, pipeWidth, bottomPipeHeight);
+
+    // Bottom pipe outline and highlight
+    ctx.strokeStyle = '#1e4c16';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(pipe.x, bottomPipeStart, pipeWidth, bottomPipeHeight);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(pipe.x + 2, bottomPipeStart + 2, pipeWidth - 4, bottomPipeHeight * 0.15);
+
+    // Bottom pipe cap
+    ctx.fillStyle = '#2d5c1d';
+    ctx.fillRect(pipe.x - 6, bottomPipeStart, pipeWidth + 12, 6);
+    ctx.strokeStyle = '#1e3c0d';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pipe.x - 6, bottomPipeStart, pipeWidth + 12, 6);
+
+    // Pipe texture lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < topPipeHeight; y += 12) {
+      ctx.beginPath();
+      ctx.moveTo(pipe.x, y);
+      ctx.lineTo(pipe.x + pipeWidth, y);
+      ctx.stroke();
+    }
+    for (let y = bottomPipeStart; y < bottomPipeStart + bottomPipeHeight; y += 12) {
+      ctx.beginPath();
+      ctx.moveTo(pipe.x, y);
+      ctx.lineTo(pipe.x + pipeWidth, y);
+      ctx.stroke();
+    }
   });
 }
 
@@ -293,36 +419,98 @@ function drawBird() {
   ctx.translate(bird.x, bird.y);
   ctx.rotate(rotation);
 
-  ctx.fillStyle = '#ffd53e';
+  // Bird shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.beginPath();
+  ctx.ellipse(0, 6, birdRadius + 2, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Main body with gradient
+  const bodyGradient = ctx.createRadialGradient(0, -2, 2, 0, 0, birdRadius);
+  bodyGradient.addColorStop(0, '#ffe94c');
+  bodyGradient.addColorStop(1, '#ffd53e');
+  ctx.fillStyle = bodyGradient;
   ctx.beginPath();
   ctx.arc(0, 0, birdRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = '#ff8b15';
+  // Feather detail on body
+  ctx.strokeStyle = 'rgba(255, 180, 0, 0.3)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(10, -10, 9, 0, Math.PI * 2);
+  ctx.arc(0, 0, birdRadius - 2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Head (orange)
+  const headGradient = ctx.createRadialGradient(8, -12, 1, 8, -10, 10);
+  headGradient.addColorStop(0, '#ffa844');
+  headGradient.addColorStop(1, '#ff8b15');
+  ctx.fillStyle = headGradient;
+  ctx.beginPath();
+  ctx.arc(10, -10, 10, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(5, -8, 4, 0, Math.PI * 2);
-  ctx.fill();
-
+  // Eye white
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.arc(7, -10, 2, 0, Math.PI * 2);
+  ctx.arc(6, -9, 5, 0, Math.PI * 2);
   ctx.fill();
 
+  // Eye iris
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(5, -8, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eye pupil shine
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(7, -10, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beak
+  ctx.fillStyle = '#ff6b2c';
+  ctx.beginPath();
+  ctx.moveTo(16, -8);
+  ctx.lineTo(26, -6);
+  ctx.lineTo(16, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#e5591f';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Wing with animation
   ctx.fillStyle = '#ffb844';
   ctx.beginPath();
-  ctx.ellipse(20, 1, 14, 8, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(20, 1 + wingOffset, 16, 10, 0.25, 0, Math.PI * 2);
   ctx.fill();
 
+  // Wing detail
+  ctx.strokeStyle = 'rgba(255, 150, 0, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(20, 1 + wingOffset, 14, 8, 0.25, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tail feathers
   ctx.fillStyle = '#ffd86d';
   ctx.beginPath();
   ctx.moveTo(-8, -3 + wingOffset);
-  ctx.lineTo(-20, -10 + wingOffset);
-  ctx.lineTo(-16, 8 + wingOffset);
+  ctx.lineTo(-22, -12 + wingOffset);
+  ctx.lineTo(-18, 10 + wingOffset);
+  ctx.closePath();
+  ctx.fill();
+
+  // Tail outline
+  ctx.strokeStyle = '#ffb844';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Chest highlight
+  ctx.fillStyle = 'rgba(255, 240, 100, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(-2, -2, 8, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -469,5 +657,7 @@ canvas.addEventListener('touchstart', event => {
 startButton.addEventListener('click', startGame);
 
 createClouds();
+createStars();
+createGrass();
 resetGame();
 requestAnimationFrame(gameLoop);
