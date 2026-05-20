@@ -27,9 +27,12 @@ let shakeAmount = 0;
 let particles = [];
 let scorePopups = [];
 let frameCount = 0;
+let bgScroll = 0;
 const clouds = [];
 const stars = [];
 const grassTufts = [];
+const bgShapes = [];
+const decorElements = [];
 const info = document.getElementById('gameInfo');
 const startButton = document.getElementById('startButton');
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -60,6 +63,52 @@ function createGrass() {
       x: i * 15,
       height: 4 + Math.random() * 6,
       width: 8 + Math.random() * 5,
+    });
+  }
+}
+
+function createBackgroundShapes() {
+  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa502', '#9b59b6', '#1abc9c'];
+  const spacing = 180;
+  
+  for (let i = -1; i < Math.ceil(canvas.width / spacing) + 2; i++) {
+    // Far background - very slow parallax
+    bgShapes.push({
+      x: i * spacing,
+      y: 50 + (i % 3) * 40,
+      size: 30 + (i % 4) * 10,
+      color: colors[i % colors.length],
+      opacity: 0.08,
+      layer: 0,
+      type: i % 3 === 0 ? 'square' : (i % 3 === 1 ? 'circle' : 'triangle'),
+    });
+    
+    // Mid background - moderate parallax
+    bgShapes.push({
+      x: i * spacing + 80,
+      y: 150 + (i % 2) * 80,
+      size: 20 + (i % 3) * 8,
+      color: colors[(i + 2) % colors.length],
+      opacity: 0.12,
+      layer: 1,
+      type: (i + 1) % 3 === 0 ? 'square' : ((i + 1) % 3 === 1 ? 'circle' : 'triangle'),
+    });
+  }
+}
+
+function createDecorations() {
+  const decorColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa502'];
+  
+  for (let i = 0; i < 8; i++) {
+    decorElements.push({
+      x: (i * 250) + Math.random() * 100,
+      y: 80 + Math.random() * 180,
+      size: 12 + Math.random() * 8,
+      color: decorColors[i % decorColors.length],
+      opacity: 0.15,
+      float: Math.random() * Math.PI * 2,
+      floatSpeed: 0.008 + Math.random() * 0.004,
+      type: Math.random() > 0.5 ? 'square' : 'circle',
     });
   }
 }
@@ -132,6 +181,7 @@ function resetGame() {
   started = false;
   lastTimestamp = 0;
   groundOffset = 0;
+  bgScroll = 0;
   currentPipeSpeed = basePipeSpeed;
   shakeAmount = 0;
   particles = [];
@@ -151,6 +201,7 @@ function startGame() {
   gameOver = false;
   started = true;
   lastTimestamp = 0;
+  bgScroll = 0;
   currentPipeSpeed = basePipeSpeed;
   shakeAmount = 0;
   particles = [];
@@ -191,6 +242,7 @@ function update() {
   bird.y += bird.vy;
   currentPipeSpeed = Math.min(maxPipeSpeed, basePipeSpeed + score * 0.08);
   groundOffset = (groundOffset - currentPipeSpeed) % 40;
+  bgScroll += currentPipeSpeed;
   shakeAmount *= 0.92;
 
   particles.forEach((p, i) => {
@@ -272,6 +324,103 @@ function drawSky() {
     ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
     ctx.fill();
   });
+}
+
+function drawBackgroundLayers() {
+  // Far background layer (slowest parallax)
+  bgShapes.forEach(shape => {
+    if (shape.layer === 0) {
+      const parallaxX = (shape.x - bgScroll * 0.2) % (canvas.width + 400);
+      ctx.globalAlpha = shape.opacity;
+      ctx.fillStyle = shape.color;
+      
+      if (shape.type === 'square') {
+        ctx.fillRect(parallaxX, shape.y, shape.size, shape.size);
+      } else if (shape.type === 'circle') {
+        ctx.beginPath();
+        ctx.arc(parallaxX + shape.size / 2, shape.y + shape.size / 2, shape.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (shape.type === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(parallaxX + shape.size / 2, shape.y);
+        ctx.lineTo(parallaxX + shape.size, shape.y + shape.size);
+        ctx.lineTo(parallaxX, shape.y + shape.size);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  });
+
+  // Mid background layer (moderate parallax)
+  bgShapes.forEach(shape => {
+    if (shape.layer === 1) {
+      const parallaxX = (shape.x - bgScroll * 0.35) % (canvas.width + 400);
+      ctx.globalAlpha = shape.opacity;
+      ctx.fillStyle = shape.color;
+      
+      if (shape.type === 'square') {
+        ctx.fillRect(parallaxX, shape.y, shape.size, shape.size);
+      } else if (shape.type === 'circle') {
+        ctx.beginPath();
+        ctx.arc(parallaxX + shape.size / 2, shape.y + shape.size / 2, shape.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (shape.type === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(parallaxX + shape.size / 2, shape.y);
+        ctx.lineTo(parallaxX + shape.size, shape.y + shape.size);
+        ctx.lineTo(parallaxX, shape.y + shape.size);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  });
+
+  // Floating decorative elements
+  decorElements.forEach(elem => {
+    const parallaxX = (elem.x - bgScroll * 0.4) % (canvas.width + 300);
+    const floatY = elem.y + Math.sin(elem.float) * 8;
+    elem.float += elem.floatSpeed;
+    
+    ctx.globalAlpha = elem.opacity;
+    ctx.fillStyle = elem.color;
+    
+    if (elem.type === 'square') {
+      ctx.save();
+      ctx.translate(parallaxX + elem.size / 2, floatY + elem.size / 2);
+      ctx.rotate(elem.float * 0.5);
+      ctx.fillRect(-elem.size / 2, -elem.size / 2, elem.size, elem.size);
+      ctx.restore();
+    } else if (elem.type === 'circle') {
+      ctx.beginPath();
+      ctx.arc(parallaxX + elem.size / 2, floatY + elem.size / 2, elem.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+  
+  ctx.globalAlpha = 1;
+}
+
+function drawGridLines() {
+  // Subtle grid overlay for depth
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.02)';
+  ctx.lineWidth = 1;
+  
+  const gridSize = 80;
+  const gridOffsetX = (bgScroll * 0.15) % gridSize;
+  
+  for (let x = -gridOffsetX; x < canvas.width; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height * 0.5);
+    ctx.stroke();
+  }
+  
+  for (let y = 0; y < canvas.height * 0.5; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0 - gridOffsetX, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
 }
 
 function drawClouds() {
@@ -612,6 +761,8 @@ function draw() {
   ctx.translate(shakeX, shakeY);
 
   drawSky();
+  drawBackgroundLayers();
+  drawGridLines();
   drawClouds();
   drawPipes();
   drawGround();
@@ -659,5 +810,7 @@ startButton.addEventListener('click', startGame);
 createClouds();
 createStars();
 createGrass();
+createBackgroundShapes();
+createDecorations();
 resetGame();
 requestAnimationFrame(gameLoop);
