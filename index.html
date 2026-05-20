@@ -1,14 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>My AI game</title>
+<title>Flappy Bird Clone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at top, #70d1ef 0%, #3cb3d5 35%, #1d86b0 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #fff;
+  }
+
+  .game-container {
+    position: relative;
+    width: min(480px, 92vw);
+    margin: 20px;
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 22px;
+    box-shadow: 0 24px 65px rgba(0, 0, 0, 0.35);
+    background: linear-gradient(to bottom, #70c5ce 0%, #4ec0eb 100%);
+  }
+
+  .overlay {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.42);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+    color: #f5f5f5;
+    text-shadow: 0 0 8px rgba(0,0,0,0.45);
+    font-size: 16px;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+
+  .start-button {
+    position: absolute;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    padding: 14px 28px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ff8f4d 0%, #ff5c5c 100%);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 16px 28px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .start-button:hover {
+    transform: translateX(-50%) scale(1.03);
+    background: linear-gradient(135deg, #ff9d5f 0%, #ff7070 100%);
+  }
+</style>
 </head>
 <body>
-
-<h1>AI game goes here</h1>
-
-
-
+<div class="game-container">
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
+  <div class="overlay" id="gameInfo">Press Start to begin.</div>
+  <button id="startButton" class="start-button">Start</button>
+</div>
 <script src="game.js"></script>
 </body>
 </html>
