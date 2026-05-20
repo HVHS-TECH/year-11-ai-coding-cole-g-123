@@ -28,6 +28,8 @@ let particles = [];
 let scorePopups = [];
 let frameCount = 0;
 let bgScroll = 0;
+let currentTheme = 0;
+let themeTransition = 0;
 const clouds = [];
 const stars = [];
 const grassTufts = [];
@@ -36,6 +38,97 @@ const decorElements = [];
 const info = document.getElementById('gameInfo');
 const startButton = document.getElementById('startButton');
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// Theme system with score progression
+const themes = [
+  {
+    name: 'Dawn',
+    scoreRange: [0, 10],
+    sky: ['#87ceeb', '#5eb3d9', '#4a9fbb', '#3a8fa8'],
+    glow: { r: 255, g: 200, b: 100 },
+    colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa502', '#9b59b6', '#1abc9c'],
+    ground: '#5c3d1f',
+    pipe: ['#5aa844', '#3d8a37', '#2d6621'],
+    groundLine: '#6d8c45',
+    accent: '#ffeb3b',
+  },
+  {
+    name: 'Noon',
+    scoreRange: [10, 20],
+    sky: ['#00d4ff', '#00b8ff', '#0098ff', '#0080ff'],
+    glow: { r: 255, g: 180, b: 50 },
+    colors: ['#ff3366', '#33ff66', '#3366ff', '#ff6633', '#66ff33', '#6633ff'],
+    ground: '#664d33',
+    pipe: ['#5aa844', '#3d8a37', '#2d6621'],
+    groundLine: '#7a9c55',
+    accent: '#ff3366',
+  },
+  {
+    name: 'Sunset',
+    scoreRange: [20, 30],
+    sky: ['#ff7e5f', '#feb47b', '#ff6b35', '#ff4500'],
+    glow: { r: 255, g: 100, b: 50 },
+    colors: ['#ff1744', '#f50057', '#d500f9', '#651fff', '#2979f3', '#00b0ff'],
+    ground: '#8b5a3c',
+    pipe: ['#8b4513', '#a0522d', '#6b3410'],
+    groundLine: '#ff8c42',
+    accent: '#ff1744',
+  },
+  {
+    name: 'Night',
+    scoreRange: [30, 40],
+    sky: ['#0a1428', '#0d1b2a', '#0f2847', '#132c4d'],
+    glow: { r: 100, g: 150, b: 255 },
+    colors: ['#00ffff', '#ff00ff', '#00ff00', '#ffff00', '#ff4500', '#1e90ff'],
+    ground: '#1a1a1a',
+    pipe: ['#1f4d1f', '#2d7a2d', '#3a9d3a'],
+    groundLine: '#00ff00',
+    accent: '#00ffff',
+  },
+  {
+    name: 'Neon',
+    scoreRange: [40, 50],
+    sky: ['#1a0033', '#330066', '#4d0099', '#6600cc'],
+    glow: { r: 100, g: 50, b: 200 },
+    colors: ['#ff006e', '#00d9ff', '#ffbe0b', '#8338ec', '#3a86ff', '#fb5607'],
+    ground: '#0d0d0d',
+    pipe: ['#ff006e', '#00d9ff', '#8338ec'],
+    groundLine: '#ff006e',
+    accent: '#00d9ff',
+  },
+  {
+    name: 'Cosmic',
+    scoreRange: [50, 100],
+    sky: ['#0d0221', '#14213d', '#1d3557', '#457b9d'],
+    glow: { r: 200, g: 100, b: 255 },
+    colors: ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557', '#ffd60a'],
+    ground: '#051622',
+    pipe: ['#e63946', '#a8dadc', '#457b9d'],
+    groundLine: '#ffd60a',
+    accent: '#f1faee',
+  },
+];
+
+function getThemeForScore() {
+  for (let i = 0; i < themes.length; i++) {
+    const [min, max] = themes[i].scoreRange;
+    if (score >= min && score < max) return i;
+  }
+  return themes.length - 1;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
+  } : { r: 0, g: 0, b: 0 };
+}
 
 function createClouds() {
   const positions = [
@@ -68,7 +161,8 @@ function createGrass() {
 }
 
 function createBackgroundShapes() {
-  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa502', '#9b59b6', '#1abc9c'];
+  const theme = themes[currentTheme];
+  const colors = theme.colors;
   const spacing = 180;
   
   for (let i = -1; i < Math.ceil(canvas.width / spacing) + 2; i++) {
@@ -97,7 +191,8 @@ function createBackgroundShapes() {
 }
 
 function createDecorations() {
-  const decorColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa502'];
+  const theme = themes[currentTheme];
+  const decorColors = theme.colors.slice(0, 4);
   
   for (let i = 0; i < 8; i++) {
     decorElements.push({
@@ -302,18 +397,22 @@ function update() {
 }
 
 function drawSky() {
+  const theme = themes[currentTheme];
+  const skyColors = theme.sky;
+  const glow = theme.glow;
+  
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#87ceeb');
-  gradient.addColorStop(0.3, '#5eb3d9');
-  gradient.addColorStop(0.7, '#4a9fbb');
-  gradient.addColorStop(1, '#3a8fa8');
+  gradient.addColorStop(0, skyColors[0]);
+  gradient.addColorStop(0.3, skyColors[1]);
+  gradient.addColorStop(0.7, skyColors[2]);
+  gradient.addColorStop(1, skyColors[3]);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Draw subtle atmospheric glow
   const glowGrad = ctx.createRadialGradient(canvas.width / 2, 0, 0, canvas.width / 2, 0, canvas.width);
-  glowGrad.addColorStop(0, 'rgba(255, 200, 100, 0.08)');
-  glowGrad.addColorStop(1, 'rgba(255, 150, 100, 0)');
+  glowGrad.addColorStop(0, `rgba(${glow.r}, ${glow.g}, ${glow.b}, 0.08)`);
+  glowGrad.addColorStop(1, `rgba(${glow.r}, ${glow.g}, ${glow.b}, 0)`);
   ctx.fillStyle = glowGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
 
@@ -453,38 +552,49 @@ function drawClouds() {
 }
 
 function drawGround() {
+  const theme = themes[currentTheme];
+  const groundColors = theme.ground.split('|'); // Will use single color for now
+  
   // Main ground fill
-  ctx.fillStyle = '#5c3d1f';
+  ctx.fillStyle = theme.ground;
   ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
 
-  // Ground layers
-  ctx.fillStyle = '#4a2f0e';
+  // Ground layers - darker shade
+  const groundDark = theme.ground.match(/^#/) ? 
+    '#' + Math.max(0, parseInt(theme.ground.slice(1, 3), 16) - 20).toString(16).padStart(2, '0') + 
+    Math.max(0, parseInt(theme.ground.slice(3, 5), 16) - 20).toString(16).padStart(2, '0') + 
+    Math.max(0, parseInt(theme.ground.slice(5, 7), 16) - 20).toString(16).padStart(2, '0') : '#2a1f15';
+  
+  ctx.fillStyle = groundDark;
   ctx.fillRect(0, canvas.height - groundHeight + 2, canvas.width, groundHeight - 2);
 
-  // Dirt texture pattern
-  ctx.fillStyle = '#3d2310';
+  // Dirt texture pattern - darker still
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
   for (let x = groundOffset; x < canvas.width + 50; x += 40) {
     ctx.fillRect(x, canvas.height - groundHeight + 4, 24, groundHeight - 4);
   }
 
-  // Soil variation
-  ctx.fillStyle = '#6b4423';
+  // Soil variation - lighter highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
   for (let x = groundOffset + 20; x < canvas.width + 50; x += 40) {
     ctx.fillRect(x, canvas.height - groundHeight + 6, 18, groundHeight - 6);
   }
 
-  // Top grass line
-  ctx.fillStyle = '#6d8c45';
+  // Top grass line - theme accent
+  ctx.fillStyle = theme.groundLine;
   ctx.fillRect(0, canvas.height - groundHeight - 1, canvas.width, 3);
 
-  // Grass tufts
+  // Grass tufts with theme colors
   grassTufts.forEach((tuft, i) => {
     const xPos = (tuft.x + groundOffset * 0.6) % canvas.width;
-    ctx.fillStyle = '#5a7a38';
+    ctx.fillStyle = theme.groundLine;
+    ctx.globalAlpha = 0.6;
     ctx.fillRect(xPos, canvas.height - groundHeight - tuft.height, tuft.width * 0.4, tuft.height);
-    ctx.fillStyle = '#7a9a4a';
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = theme.groundLine;
     ctx.fillRect(xPos + tuft.width * 0.35, canvas.height - groundHeight - tuft.height, tuft.width * 0.35, tuft.height);
   });
+  ctx.globalAlpha = 1;
 
   // Ground shine/highlight
   ctx.fillStyle = 'rgba(200, 180, 160, 0.06)';
@@ -492,6 +602,9 @@ function drawGround() {
 }
 
 function drawPipes() {
+  const theme = themes[currentTheme];
+  const pipeColors = theme.pipe;
+  
   pipes.forEach(pipe => {
     const topPipeHeight = pipe.top;
     const bottomPipeStart = pipe.top + pipeGap;
@@ -499,47 +612,51 @@ function drawPipes() {
 
     // Top pipe
     const topGradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
-    topGradient.addColorStop(0, '#5aa844');
-    topGradient.addColorStop(0.5, '#3d8a37');
-    topGradient.addColorStop(1, '#2d6621');
+    topGradient.addColorStop(0, pipeColors[0]);
+    topGradient.addColorStop(0.5, pipeColors[1]);
+    topGradient.addColorStop(1, pipeColors[2]);
     ctx.fillStyle = topGradient;
     ctx.fillRect(pipe.x, 0, pipeWidth, topPipeHeight);
 
     // Top pipe outline and highlight
-    ctx.strokeStyle = '#1e4c16';
+    ctx.strokeStyle = pipeColors[2];
     ctx.lineWidth = 4;
     ctx.strokeRect(pipe.x, 0, pipeWidth, topPipeHeight);
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.fillRect(pipe.x + 2, 2, pipeWidth - 4, topPipeHeight * 0.15);
 
     // Top pipe cap
-    ctx.fillStyle = '#2d5c1d';
+    ctx.fillStyle = pipeColors[2];
     ctx.fillRect(pipe.x - 6, topPipeHeight - 6, pipeWidth + 12, 6);
-    ctx.strokeStyle = '#1e3c0d';
+    ctx.strokeStyle = pipeColors[2];
+    ctx.globalAlpha = 0.5;
     ctx.lineWidth = 2;
     ctx.strokeRect(pipe.x - 6, topPipeHeight - 6, pipeWidth + 12, 6);
+    ctx.globalAlpha = 1;
 
     // Bottom pipe
     const bottomGradient = ctx.createLinearGradient(pipe.x, bottomPipeStart, pipe.x + pipeWidth, bottomPipeStart);
-    bottomGradient.addColorStop(0, '#5aa844');
-    bottomGradient.addColorStop(0.5, '#3d8a37');
-    bottomGradient.addColorStop(1, '#2d6621');
+    bottomGradient.addColorStop(0, pipeColors[0]);
+    bottomGradient.addColorStop(0.5, pipeColors[1]);
+    bottomGradient.addColorStop(1, pipeColors[2]);
     ctx.fillStyle = bottomGradient;
     ctx.fillRect(pipe.x, bottomPipeStart, pipeWidth, bottomPipeHeight);
 
     // Bottom pipe outline and highlight
-    ctx.strokeStyle = '#1e4c16';
+    ctx.strokeStyle = pipeColors[2];
     ctx.lineWidth = 4;
     ctx.strokeRect(pipe.x, bottomPipeStart, pipeWidth, bottomPipeHeight);
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.fillRect(pipe.x + 2, bottomPipeStart + 2, pipeWidth - 4, bottomPipeHeight * 0.15);
 
     // Bottom pipe cap
-    ctx.fillStyle = '#2d5c1d';
+    ctx.fillStyle = pipeColors[2];
     ctx.fillRect(pipe.x - 6, bottomPipeStart, pipeWidth + 12, 6);
-    ctx.strokeStyle = '#1e3c0d';
+    ctx.strokeStyle = pipeColors[2];
+    ctx.globalAlpha = 0.5;
     ctx.lineWidth = 2;
     ctx.strokeRect(pipe.x - 6, bottomPipeStart, pipeWidth + 12, 6);
+    ctx.globalAlpha = 1;
 
     // Pipe texture lines
     ctx.strokeStyle = 'rgba(0,0,0,0.1)';
@@ -754,6 +871,16 @@ function drawHUD() {
 }
 
 function draw() {
+  // Check if theme has changed
+  const newTheme = getThemeForScore();
+  if (newTheme !== currentTheme) {
+    currentTheme = newTheme;
+    bgShapes.length = 0;
+    decorElements.length = 0;
+    createBackgroundShapes();
+    createDecorations();
+  }
+
   const shakeX = (Math.random() - 0.5) * shakeAmount;
   const shakeY = (Math.random() - 0.5) * shakeAmount;
 
